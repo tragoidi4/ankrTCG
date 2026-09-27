@@ -151,9 +151,9 @@ export class MyDurableObject extends DurableObject<Env> {
 				}
 				const previousTurnPlayer = this.turnPlayer;
 				this.turnPlayer = target;
-				const turnUpdate = {type:"turn_changed",previousTurnPlayer,turnPlayer:this.turnPlayer};
+				const firstPlayerUpdate = {type:"first_player_set",turnPlayer:this.turnPlayer};
 				for (const [socket] of this.sockets) {
-					if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(turnUpdate));
+					if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(firstPlayerUpdate));
 				}
 				return;
 			}
