@@ -106,6 +106,19 @@ export class MyDurableObject extends DurableObject<Env> {
 				return;
 			}
 
+			if (operation.action === "log") {
+				const text = typeof (message as {text?: unknown}).text === "string" ? (message as {text:string}).text.slice(0,200) : "";
+				if (!text) {
+					server.send(JSON.stringify({type:"error",message:"Log text is required"}));
+					return;
+				}
+				const logUpdate = JSON.stringify({type:"log",playerId,text});
+				for (const [socket] of this.sockets) {
+					if (socket !== server && socket.readyState === WebSocket.OPEN) socket.send(logUpdate);
+				}
+				return;
+			}
+
 			if (operation.action === "set_name") {
 				const name = typeof operation.name === "string" ? operation.name.trim().slice(0,16) : "";
 				if (!name) {
