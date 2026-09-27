@@ -32,8 +32,8 @@ export class MyDurableObject extends DurableObject<Env> {
 
 		server.accept();
 
-		const playerNumber = this.sockets.size + 1;
-		const playerId = `player${playerNumber}`;
+		const usedPlayerIds = new Set(this.sockets.values());
+		const playerId = usedPlayerIds.has("player1") ? "player2" : "player1";
 
 		this.sockets.set(server, playerId);
 
