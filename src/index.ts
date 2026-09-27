@@ -139,6 +139,25 @@ export class MyDurableObject extends DurableObject<Env> {
 				return;
 			}
 
+			if (operation.action === "set_first_player") {
+				if (playerId !== "player1" && playerId !== "player2") {
+					server.send(JSON.stringify({type:"error",message:"Invalid player"}));
+					return;
+				}
+				const target = (message as {target?: unknown}).target;
+				if (target !== "player1" && target !== "player2") {
+					server.send(JSON.stringify({type:"error",message:"Invalid first player"}));
+					return;
+				}
+				const previousTurnPlayer = this.turnPlayer;
+				this.turnPlayer = target;
+				const turnUpdate = {type:"turn_changed",previousTurnPlayer,turnPlayer:this.turnPlayer};
+				for (const [socket] of this.sockets) {
+					if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(turnUpdate));
+				}
+				return;
+			}
+
 			if (operation.action === "end_turn") {
 				if (playerId !== this.turnPlayer) {
 					server.send(JSON.stringify({type:"error",message:"Not your turn"}));
