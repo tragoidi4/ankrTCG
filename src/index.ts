@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 
 export class MyDurableObject extends DurableObject<Env> {
 	private sockets = new Map<WebSocket, string>();
+	private sessionSeats = new Map<string, string>();
 	private turnPlayer = "player1";
 
 	constructor(ctx: DurableObjectState, env: Env) {
@@ -15,6 +16,8 @@ export class MyDurableObject extends DurableObject<Env> {
 
 		const pair = new WebSocketPair();
 		const [client, server] = Object.values(pair);
+		const session = new URL(request.url).searchParams.get("session");
+		if (!session) return new Response("Session is required", { status: 400 });
 
 		for (const [socket] of this.sockets) {
 			if (socket.readyState !== WebSocket.OPEN) {
@@ -38,8 +41,21 @@ export class MyDurableObject extends DurableObject<Env> {
 
 		server.accept();
 
-		const usedPlayerIds = new Set(this.sockets.values());
-		const playerId = usedPlayerIds.has("player1") ? "player2" : "player1";
+		const savedPlayerId = this.sessionSeats.get(session);
+		let playerId: string;
+		if (savedPlayerId) {
+			playerId = savedPlayerId;
+			for (const [oldSocket, oldPlayerId] of this.sockets) {
+				if (oldPlayerId === playerId) {
+					this.sockets.delete(oldSocket);
+					if (oldSocket.readyState === WebSocket.OPEN) oldSocket.close(1000, "Reconnected");
+				}
+			}
+		} else {
+			const usedPlayerIds = new Set(this.sockets.values());
+			playerId = usedPlayerIds.has("player1") ? "player2" : "player1";
+			this.sessionSeats.set(session, playerId);
+		}
 
 		this.sockets.set(server, playerId);
 
