@@ -16,6 +16,12 @@ export class MyDurableObject extends DurableObject<Env> {
 		const pair = new WebSocketPair();
 		const [client, server] = Object.values(pair);
 
+		for (const [socket] of this.sockets) {
+			if (socket.readyState !== WebSocket.OPEN) {
+				this.sockets.delete(socket);
+			}
+		}
+
 		if (this.sockets.size >= 2) {
 			server.accept();
 			server.send(JSON.stringify({
@@ -46,9 +52,9 @@ export class MyDurableObject extends DurableObject<Env> {
 		for (const [socket] of this.sockets) {
 			if (socket !== server && socket.readyState === WebSocket.OPEN) {
 				socket.send(JSON.stringify({
-					type: "player_joined",
-					playerId,
-				}));
+				type: "player_joined",
+				playerId,
+			}));
 			}
 		}
 
