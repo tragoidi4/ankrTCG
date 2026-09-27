@@ -112,8 +112,9 @@ export class MyDurableObject extends DurableObject<Env> {
 					server.send(JSON.stringify({type:"error",message:"Not your turn"}));
 					return;
 				}
+				const previousTurnPlayer = this.turnPlayer;
 				this.turnPlayer = this.turnPlayer === "player1" ? "player2" : "player1";
-				const turnUpdate = {type:"turn_changed",turnPlayer:this.turnPlayer};
+				const turnUpdate = {type:"turn_changed",previousTurnPlayer,turnPlayer:this.turnPlayer};
 				for (const [socket] of this.sockets) {
 					if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(turnUpdate));
 				}
