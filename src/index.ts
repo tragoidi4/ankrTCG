@@ -4,6 +4,7 @@ export class MyDurableObject extends DurableObject<Env> {
 	private sockets = new Map<WebSocket, string>();
 	private sessionSeats = new Map<string, string>();
 	private playerNames = new Map<string, string>();
+	private publicStates = new Map<string, unknown>();
 	private turnPlayer = "player1";
 
 	constructor(ctx: DurableObjectState, env: Env) {
@@ -64,6 +65,11 @@ export class MyDurableObject extends DurableObject<Env> {
 		};
 
 		server.send(JSON.stringify({type:"joined",playerId,turnPlayer:this.turnPlayer,players}));
+		for (const [otherPlayerId, publicState] of this.publicStates) {
+			if (otherPlayerId !== playerId) {
+				server.send(JSON.stringify({type:"public_state",playerId:otherPlayerId,state:publicState}));
+			}
+		}
 
 		for (const [socket] of this.sockets) {
 			if (socket !== server && socket.readyState === WebSocket.OPEN) {
@@ -86,6 +92,19 @@ export class MyDurableObject extends DurableObject<Env> {
 			}
 
 			const operation = message as {type:string;action?:string;name?:string};
+
+			if (operation.action === "sync_public_state") {
+				if (!("state" in message) || typeof message.state !== "object" || message.state === null) {
+					server.send(JSON.stringify({type:"error",message:"Invalid public state"}));
+					return;
+				}
+				this.publicStates.set(playerId, message.state);
+				const update = JSON.stringify({type:"public_state",playerId,state:message.state});
+				for (const [socket] of this.sockets) {
+					if (socket.readyState === WebSocket.OPEN) socket.send(update);
+				}
+				return;
+			}
 
 			if (operation.action === "set_name") {
 				const name = typeof operation.name === "string" ? operation.name.trim().slice(0,16) : "";
