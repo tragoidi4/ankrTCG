@@ -142,6 +142,8 @@ export class MyDurableObject extends DurableObject<Env> {
 					deckCounters: Number.isFinite(rawState.deckCounters) ? rawState.deckCounters : 0,
 					deckHorizontal: rawState.deckHorizontal === true,
 					facedownCount: Number.isInteger(rawState.facedownCount) && rawState.facedownCount >= 0 ? rawState.facedownCount : 0,
+					revealedHand: sanitizeCards(rawState.revealedHand).filter((card: {revealed?: boolean}) => card.revealed === true),
+					facedownPublic: sanitizeCards(rawState.facedownPublic).filter((card: {faceUp?: boolean}) => card.faceUp === true),
 					monsters: sanitizeCards(rawState.monsters),
 					energy: sanitizeCards(rawState.energy),
 					field: sanitizeCards(rawState.field),
