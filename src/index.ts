@@ -5,7 +5,6 @@ export class MyDurableObject extends DurableObject<Env> {
 	private sessionSeats = new Map<string, string>();
 	private playerNames = new Map<string, string>();
 	private publicStates = new Map<string, unknown>();
-	private roomState: unknown = null;
 	private reconnectingPlayers = new Set<string>();
 	private turnPlayer = "player1";
 
@@ -16,6 +15,19 @@ export class MyDurableObject extends DurableObject<Env> {
 	async fetch(request: Request): Promise<Response> {
 		if (request.headers.get("Upgrade") !== "websocket") {
 			return new Response("WebSocket room", { status: 200 });
+		}
+
+		const savedRoom = await this.ctx.storage.get<{
+			publicStates?: Record<string, unknown>;
+			playerNames?: Record<string, string>;
+			sessionSeats?: Record<string, string>;
+			turnPlayer?: string;
+		}>("roomState");
+		if (savedRoom) {
+			for (const [id, state] of Object.entries(savedRoom.publicStates || {})) this.publicStates.set(id, state);
+			for (const [id, name] of Object.entries(savedRoom.playerNames || {})) this.playerNames.set(id, name);
+			for (const [sessionId, id] of Object.entries(savedRoom.sessionSeats || {})) this.sessionSeats.set(sessionId, id);
+			if (savedRoom.turnPlayer === "player1" || savedRoom.turnPlayer === "player2") this.turnPlayer = savedRoom.turnPlayer;
 		}
 
 		const pair = new WebSocketPair();
@@ -107,7 +119,12 @@ export class MyDurableObject extends DurableObject<Env> {
 					return;
 				}
 				this.publicStates.set(playerId, message.state);
-				this.roomState = message.state;
+				await this.ctx.storage.put("roomState", {
+					publicStates: Object.fromEntries(this.publicStates),
+					playerNames: Object.fromEntries(this.playerNames),
+					sessionSeats: Object.fromEntries(this.sessionSeats),
+					turnPlayer: this.turnPlayer,
+				});
 				const update = JSON.stringify({type:"public_state",playerId,state:message.state});
 				for (const [socket] of this.sockets) {
 					if (socket.readyState === WebSocket.OPEN) socket.send(update);
