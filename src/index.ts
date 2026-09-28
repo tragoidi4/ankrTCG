@@ -5,6 +5,7 @@ export class MyDurableObject extends DurableObject<Env> {
 	private sessionSeats = new Map<string, string>();
 	private playerNames = new Map<string, string>();
 	private publicStates = new Map<string, unknown>();
+	private reconnectingPlayers = new Set<string>();
 	private turnPlayer = "player1";
 
 	constructor(ctx: DurableObjectState, env: Env) {
@@ -29,6 +30,7 @@ export class MyDurableObject extends DurableObject<Env> {
 		if (savedPlayerId) {
 			for (const [oldSocket, oldPlayerId] of this.sockets) {
 				if (oldPlayerId === savedPlayerId) {
+					this.reconnectingPlayers.add(oldPlayerId);
 					this.sockets.delete(oldSocket);
 					if (oldSocket.readyState === WebSocket.OPEN) oldSocket.close(1000, "Reconnected");
 				}
@@ -180,6 +182,10 @@ export class MyDurableObject extends DurableObject<Env> {
 
 		server.addEventListener("close", () => {
 			this.sockets.delete(server);
+			if (this.reconnectingPlayers.has(playerId)) {
+				this.reconnectingPlayers.delete(playerId);
+				return;
+			}
 			for (const [socket] of this.sockets) {
 				if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({type:"player_left",playerId}));
 			}
