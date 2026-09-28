@@ -5,6 +5,7 @@ export class MyDurableObject extends DurableObject<Env> {
 	private sessionSeats = new Map<string, string>();
 	private playerNames = new Map<string, string>();
 	private publicStates = new Map<string, unknown>();
+	private roomState: unknown = null;
 	private reconnectingPlayers = new Set<string>();
 	private turnPlayer = "player1";
 
@@ -106,6 +107,7 @@ export class MyDurableObject extends DurableObject<Env> {
 					return;
 				}
 				this.publicStates.set(playerId, message.state);
+				this.roomState = message.state;
 				const update = JSON.stringify({type:"public_state",playerId,state:message.state});
 				for (const [socket] of this.sockets) {
 					if (socket.readyState === WebSocket.OPEN) socket.send(update);
