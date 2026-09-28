@@ -114,10 +114,12 @@ export class MyDurableObject extends DurableObject<Env> {
 			const operation = message as {type:string;action?:string;name?:string};
 
 			if (operation.action === "sync_public_state") {
-				if (!("state" in message) || typeof message.state !== "object" || message.state === null) {
+				if (!("state" in message) || typeof message.state !== "object" || message.state === null || Array.isArray(message.state)) {
 					server.send(JSON.stringify({type:"error",message:"Invalid public state"}));
 					return;
 				}
+				// A public state is always stored under the authenticated sender's player ID.
+				// The client can never choose which player's state to overwrite.
 				this.publicStates.set(playerId, message.state);
 				await this.ctx.storage.put("roomState", {
 					publicStates: Object.fromEntries(this.publicStates),
