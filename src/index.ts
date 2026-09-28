@@ -65,8 +65,10 @@ export class MyDurableObject extends DurableObject<Env> {
 			player1: this.playerNames.get("player1") || "プレイヤー1",
 			player2: this.playerNames.get("player2") || "プレイヤー2",
 		};
+		const roomStatus = () => JSON.stringify({type:"room_status",playerCount:this.sockets.size});
 
 		server.send(JSON.stringify({type:"joined",playerId,turnPlayer:this.turnPlayer,players}));
+		server.send(roomStatus());
 		for (const [otherPlayerId, publicState] of this.publicStates) {
 			if (otherPlayerId !== playerId) {
 				server.send(JSON.stringify({type:"public_state",playerId:otherPlayerId,state:publicState}));
@@ -77,6 +79,9 @@ export class MyDurableObject extends DurableObject<Env> {
 			if (socket !== server && socket.readyState === WebSocket.OPEN) {
 				socket.send(JSON.stringify({type:"player_joined",playerId,players}));
 			}
+		}
+		for (const [socket] of this.sockets) {
+			if (socket.readyState === WebSocket.OPEN) socket.send(roomStatus());
 		}
 
 		server.addEventListener("message", (event) => {
@@ -142,6 +147,10 @@ export class MyDurableObject extends DurableObject<Env> {
 			}
 
 			if (operation.action === "set_first_player") {
+				if (this.sockets.size < 2) {
+					server.send(JSON.stringify({type:"error",message:"Opponent is not connected"}));
+					return;
+				}
 				if (playerId !== "player1" && playerId !== "player2") {
 					server.send(JSON.stringify({type:"error",message:"Invalid player"}));
 					return;
@@ -188,6 +197,10 @@ export class MyDurableObject extends DurableObject<Env> {
 			}
 			for (const [socket] of this.sockets) {
 				if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({type:"player_left",playerId}));
+			}
+			const status = JSON.stringify({type:"room_status",playerCount:this.sockets.size});
+			for (const [socket] of this.sockets) {
+				if (socket.readyState === WebSocket.OPEN) socket.send(status);
 			}
 		});
 
