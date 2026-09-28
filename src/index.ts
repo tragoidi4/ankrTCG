@@ -118,16 +118,47 @@ export class MyDurableObject extends DurableObject<Env> {
 					server.send(JSON.stringify({type:"error",message:"Invalid public state"}));
 					return;
 				}
+				// Only explicitly public fields are accepted. Private hand/deck contents are never stored or relayed.
+				const rawState = message.state as Record<string, unknown>;
+				const sanitizeCards = (value: unknown) => Array.isArray(value)
+					? value.filter(card => typeof card === "object" && card !== null).map(card => {
+						const c = card as Record<string, unknown>;
+						return {
+							id: typeof c.id === "string" ? c.id : "",
+							name: typeof c.name === "string" ? c.name : "",
+							faceUp: c.faceUp !== false,
+							revealed: c.revealed === true,
+							tapped: c.tapped === true,
+							counters: Number.isFinite(c.counters) ? c.counters : 0,
+							damage: Number.isFinite(c.damage) ? c.damage : 0,
+							modification: Number.isFinite(c.modification) ? c.modification : 0,
+						};
+					})
+					: [];
+				const publicState = {
+					life: Number.isFinite(rawState.life) ? rawState.life : 0,
+					handCount: Number.isInteger(rawState.handCount) && rawState.handCount >= 0 ? rawState.handCount : 0,
+					deckCount: Number.isInteger(rawState.deckCount) && rawState.deckCount >= 0 ? rawState.deckCount : 0,
+					deckCounters: Number.isFinite(rawState.deckCounters) ? rawState.deckCounters : 0,
+					deckHorizontal: rawState.deckHorizontal === true,
+					facedownCount: Number.isInteger(rawState.facedownCount) && rawState.facedownCount >= 0 ? rawState.facedownCount : 0,
+					monsters: sanitizeCards(rawState.monsters),
+					energy: sanitizeCards(rawState.energy),
+					field: sanitizeCards(rawState.field),
+					discard: sanitizeCards(rawState.discard),
+					pendingDiscard: rawState.pendingDiscard === true,
+					gameOver: rawState.gameOver && typeof rawState.gameOver === "object" ? rawState.gameOver : null,
+				};
 				// A public state is always stored under the authenticated sender's player ID.
 				// The client can never choose which player's state to overwrite.
-				this.publicStates.set(playerId, message.state);
+				this.publicStates.set(playerId, publicState);
 				await this.ctx.storage.put("roomState", {
 					publicStates: Object.fromEntries(this.publicStates),
 					playerNames: Object.fromEntries(this.playerNames),
 					sessionSeats: Object.fromEntries(this.sessionSeats),
 					turnPlayer: this.turnPlayer,
 				});
-				const update = JSON.stringify({type:"public_state",playerId,state:message.state});
+				const update = JSON.stringify({type:"public_state",playerId,state:publicState});
 				for (const [socket] of this.sockets) {
 					if (socket.readyState === WebSocket.OPEN) socket.send(update);
 				}
