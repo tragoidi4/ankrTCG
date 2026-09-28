@@ -134,6 +134,23 @@ export class MyDurableObject extends DurableObject<Env> {
 				return;
 			}
 
+			if (operation.action === "move_card") {
+				const zone = (message as {zone?: unknown}).zone;
+				const dest = (message as {dest?: unknown}).dest;
+				const cardId = (message as {cardId?: unknown}).cardId;
+				const allowedZones = new Set(["hand","monsters","energy","field","facedown","discard","deck"]);
+				if (typeof zone !== "string" || typeof dest !== "string" || typeof cardId !== "string" ||
+					!allowedZones.has(zone) || !allowedZones.has(dest) || !cardId) {
+					server.send(JSON.stringify({type:"error",message:"Invalid card move"}));
+					return;
+				}
+				const moveUpdate = JSON.stringify({type:"card_move",playerId,zone,dest,cardId});
+				for (const [socket] of this.sockets) {
+					if (socket.readyState === WebSocket.OPEN) socket.send(moveUpdate);
+				}
+				return;
+			}
+
 			if (operation.action === "log") {
 				const text = typeof (message as {text?: unknown}).text === "string" ? (message as {text:string}).text.slice(0,200) : "";
 				if (!text) {
