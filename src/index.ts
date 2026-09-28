@@ -97,7 +97,7 @@ export class MyDurableObject extends DurableObject<Env> {
 			if (socket.readyState === WebSocket.OPEN) socket.send(roomStatus());
 		}
 
-		server.addEventListener("message", (event) => {
+		server.addEventListener("message", async (event) => {
 			let message: unknown;
 			try {
 				message = JSON.parse(String(event.data));
